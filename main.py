@@ -1,6 +1,10 @@
-def main():
-    print("Hello from thelibrary!")
+import os
+from dotenv import load_dotenv
+import psycopg
 
+load_dotenv()
 
-if __name__ == "__main__":
-    main()
+with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+    with conn.cursor() as cur:
+        cur.execute("SELECT version();")
+        print(cur.fetchone()[0])
