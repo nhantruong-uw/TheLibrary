@@ -1,10 +1,11 @@
-import os
-from dotenv import load_dotenv
-import psycopg
+from pathlib import Path
 
-load_dotenv()
+from file_discovery_inventory import find_pdfs, hash_file, file_stats
 
-with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
-    with conn.cursor() as cur:
-        cur.execute("SELECT version();")
-        print(cur.fetchone()[0])
+pdfs = find_pdfs(Path("test_corpus"))
+for pdf in pdfs:
+    print(hash_file(pdf), pdf.name)
+    stat = file_stats(pdf)
+    print("size: ", stat["size"])
+    print("mtime: ", stat["mtime"])
+    
