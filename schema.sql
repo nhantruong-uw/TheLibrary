@@ -9,7 +9,9 @@ CREATE TABLE documents(
     authors text[], 
     page_count INT,
     ingested_timestamp TIMESTAMPTZ NOT NULL DEFAULT now(), -- automated and real time-stamp
-    status doc_status NOT NULL DEFAULT 'pending'
+    status doc_status NOT NULL DEFAULT 'pending',
+    file_size BIGINT,
+    file_mtime DOUBlE PRECISION
 );
 
 CREATE TABLE chunks(
