@@ -1,7 +1,4 @@
 import pymupdf
-import psycopg
-from config import DATABASE_URL, CORPUS_DIR
-import time
 
 def classify_document(doc) -> str:
     """
@@ -75,26 +72,3 @@ def extract_one(conn, doc_id: int, full_path: str):
                 (str(e), doc_id),
             )
     conn.commit()
-
-def run_extraction(status="pending"):
-    """
-    find all pdfs with relevant status and extract information about those pdfs into db documents
-    prints out allotted time for measurements
-    Parameters:
-        status: status wanted from pdfs; default pending
-
-    Returns:
-        none
-    """
-    with psycopg.connect(DATABASE_URL) as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id, rel_path FROM documents WHERE status = %s;", (status))
-            docs = cur.fetchall()
-
-        print(f"{len(docs)} documents to extract")
-        for doc_id, rel_path in docs:
-            full_path = CORPUS_DIR / rel_path
-            start = time.perf_counter()
-            extract_one(conn, doc_id, str(full_path))
-            elapsed = time.perf_counter() - start
-            print(f"{elapsed:6.2f}s  {rel_path}")

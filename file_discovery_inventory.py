@@ -1,8 +1,7 @@
 import logging
 from pathlib import Path
 import hashlib
-import psycopg
-from config import DATABASE_URL, CORPUS_DIR
+from config import CORPUS_DIR
 
 log = logging.getLogger(__name__)
 
@@ -53,7 +52,7 @@ def file_stats(path: Path) -> dict:
     st = path.stat()
     return {"size": st.st_size, "mtime": st.st_mtime}
 
-def ingest_files(root: Path):
+def ingest_file(conn, file_path: Path):
     """
     Given a file, insert the file and relevant information into the database as indicated by DATABASE_URL;
     commits final query at the end to ensure changes
@@ -64,21 +63,19 @@ def ingest_files(root: Path):
     Returns:
         Nothing; sql errors if any
     """
-    with psycopg.connect(DATABASE_URL) as conn:
-        with conn.cursor() as cur:
-            for path in find_pdfs(root):
-                file_hash = hash_file(path)
-                st = path.stat()
-                rel_path = str(path.relative_to(root))
-                cur.execute(
-                    """
-                    INSERT INTO documents (drive_id, rel_path, file_hash, file_size, file_mtime)
-                    VALUES (%s, %s, %s, %s, %s)
-                    ON CONFLICT (file_hash) DO NOTHING
-                    """,
-                    ("test_corpus", rel_path, file_hash, st.st_size, st.st_mtime),
-                )
-        conn.commit()
+    with conn.cursor() as cur:
+        file_hash = hash_file(file_path)
+        st = file_path.stat()
+        rel_path = str(file_path.relative_to(Path(CORPUS_DIR)))
+        cur.execute(
+            """
+            INSERT INTO documents (drive_id, rel_path, file_hash, file_size, file_mtime)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (file_hash) DO NOTHING
+            """,
+            (CORPUS_DIR, rel_path, file_hash, st.st_size, st.st_mtime),
+        )
+    conn.commit()
 
 def status_counts(conn):
     """
