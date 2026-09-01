@@ -1,4 +1,4 @@
-CREATE TYPE doc_status AS ENUM ('pending', 'extraced', 'chunked', 'embedded', 'failed', 'needs_ocr');
+CREATE TYPE doc_status AS ENUM ('pending', 'extracted', 'chunked', 'embedded', 'failed', 'needs_ocr');
 
 CREATE TABLE documents(
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -11,7 +11,10 @@ CREATE TABLE documents(
     ingested_timestamp TIMESTAMPTZ NOT NULL DEFAULT now(), -- automated and real time-stamp
     status doc_status NOT NULL DEFAULT 'pending',
     file_size BIGINT,
-    file_mtime DOUBlE PRECISION
+    file_mtime DOUBlE PRECISION,
+    text_source TEXT,
+    error_msg TEXT,
+    full_text TEXT
 );
 
 CREATE TABLE chunks(
