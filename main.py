@@ -118,12 +118,85 @@ def run_chunking(conn):
         count += 1
     print("Finished chunking " + str(count) + "/" + str(len(docs)) + " documents")
 
+from pathlib import Path
+
+def discover_incremental(conn, root: Path, drive_id: str):
+    # load what we already know: path -> (size, mtime)
+    with conn.cursor() as cur:
+        cur.execute("SELECT rel_path, file_size, file_mtime FROM documents WHERE drive_id = %s", [drive_id])
+        known = {rel: (size, mtime) for rel, size, mtime in cur.fetchall()}
+
+    new_or_changed = 0
+    for path in find_pdfs(root):
+        rel_path = str(path.relative_to(root))
+        st = path.stat()
+
+        prior = known.get(rel_path)
+        if prior is not None and prior[0] == st.st_size and abs(prior[1] - st.st_mtime) < 2:
+            continue   # unchanged — skip without hashing
+
+        # new or changed: hash and upsert
+        file_hash = hash_file(path)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO documents (drive_id, rel_path, file_hash, file_size, file_mtime)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (file_hash) DO UPDATE
+                    SET rel_path = EXCLUDED.rel_path,
+                        file_size = EXCLUDED.file_size,
+                        file_mtime = EXCLUDED.file_mtime
+                """,
+                (drive_id, rel_path, file_hash, st.st_size, st.st_mtime),
+            )
+        new_or_changed += 1
+    conn.commit()
+    print(f"{new_or_changed} new or changed files")
+
 from mounting import resolve_corpus_root, DRIVE_ID, find_mountpoint
 
 if __name__ == "__main__":
-    with psycopg.connect(DATABASE_URL) as conn:
-        root = resolve_corpus_root(DRIVE_ID) / "Files" / "Sherlock Holmes"
-        ingest_files(conn, root, DRIVE_ID)
-        run_extraction(conn, root=root)
-        run_metadata_backfill(conn, root=root)
-        run_chunking(conn)
+    main_root = resolve_corpus_root(DRIVE_ID) / "Files"
+    print("Welcome to TheLibrary. What would you like to do?")
+    print("-------------------------------------------------")
+    print("Current root: " + str(main_root))
+    print("(1) Load an entire new folder")
+    print("(2) Check for changed/new files")
+    choice = input("Input: ")
+
+    if choice == "1":
+        print("What is your desired directory?")
+        folder = input("Desired Directory: ")
+        with psycopg.connect(DATABASE_URL) as conn:
+                root = main_root / folder
+                print("Begin ingesting files...")
+                print("-" * 20)
+                ingest_files(conn, root, DRIVE_ID)
+                print("-" * 20)
+                print("...End ingesting files")
+                print()
+                print("Begin extraction...")
+                print("-" * 20)
+                run_extraction(conn, root=root)
+                print("-" * 20)
+                print("...End extraction")
+                print()
+                print("Begin backfill...")
+                print("-" * 20)
+                run_metadata_backfill(conn, root=root)
+                print("-" * 20)
+                print("...End backfill")
+                print()
+                print("Begin chunking...")
+                print("-" * 20)
+                run_chunking(conn)
+                print("-" * 20)
+                print("...End chunking")
+    elif choice == "2":
+        print("What is your desired directory?")
+        folder = input("Desired Directory: ")
+        with psycopg.connect(DATABASE_URL) as conn:
+            root = main_root / folder
+            discover_incremental(conn, root, DRIVE_ID)
+    else:
+        print("Choice not understood. Exiting...")
