@@ -65,7 +65,7 @@ if query:
                 st.markdown(f"- *(pg {p}):* " + safe, unsafe_allow_html=True)
 
                 with st.expander("Show Page"):
-                    full_path = DRIVE_MOUNT + "/Files/Sherlock Holmes/" + cleaned_results[r]['rel_path']
+                    full_path = DRIVE_MOUNT + "/Files/" + cleaned_results[r]['rel_path']
                     img = cached_render(full_path, int(p), query)
                     if img:
                         st.image(img)
