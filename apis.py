@@ -16,7 +16,7 @@ class SearchResult(BaseModel):
 SEARCH_SQL = """
     SELECT
         ts_headline('english', c.chunk_text, plainto_tsquery('english', %(q)s),
-                    'StartSel=**, StopSel=**, MaxWords=35, MinWords=15') AS snippet,
+                    'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15') AS snippet,
         c.page_num,
         d.id AS document_id,
         COALESCE(d.title, d.rel_path) AS title,
