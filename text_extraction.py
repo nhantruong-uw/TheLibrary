@@ -36,7 +36,8 @@ def detect_text_source(doc) -> str:
 
 def extract_one(conn, doc_id: int, full_path: str):
     """
-    try to extract from a pdf and update the documents as needed
+    try to extract from a pdf and update the documents as needed;
+    returns need_ocr status if pdf not have enough avg char per page
 
     Parameters:
         conn
@@ -48,7 +49,7 @@ def extract_one(conn, doc_id: int, full_path: str):
     try:
         doc = pymupdf.open(full_path)
         try:
-            text = "".join(page.get_text() for page in doc)
+            text, page_offsets = extract_text_with_pages(doc)
             chars_per_page = len(text) / max(len(doc), 1)
             status = "needs_ocr" if chars_per_page < 50 else "extracted"
             source = detect_text_source(doc)
@@ -60,7 +61,7 @@ def extract_one(conn, doc_id: int, full_path: str):
             cur.execute(
                 """
                 UPDATE documents
-                SET status = %s, text_source = %s, page_count = %s, full_text = %s
+                SET status = %s, text_source = %s, page_count = %s, full_text = %s, page_offsets = %s
                 WHERE id = %s
                 """,
                 (status, source, page_count, text, doc_id),
@@ -72,3 +73,20 @@ def extract_one(conn, doc_id: int, full_path: str):
                 (str(e), doc_id),
             )
     conn.commit()
+
+def extract_text_with_pages(doc):
+    parts = []
+    page_offsets = []   # char offset where each page begins in full_text
+    cursor = 0
+    for page in doc:
+        page_offsets.append(cursor)
+        t = page.get_text()
+        parts.append(t)
+        cursor += len(t)
+    full_text = "".join(parts)
+    return full_text, page_offsets
+
+import bisect
+def page_for_offset(char_start, page_offsets):
+    # rightmost page whose start is <= char_start; +1 for 1-indexed display
+    return bisect.bisect_right(page_offsets, char_start)
