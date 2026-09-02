@@ -40,6 +40,7 @@ def find_mountpoint(drive_uuid: str) -> str | None:
     return search(data.get("blockdevices", []))
 
 DRIVE_ID = "029B-2C3A"
+DRIVE_MOUNT = find_mountpoint(DRIVE_ID)
 
 def resolve_corpus_root(drive_id: str) -> Path:
     mount = find_mountpoint(drive_id)
