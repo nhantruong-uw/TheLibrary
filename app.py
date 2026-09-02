@@ -18,10 +18,8 @@ def render_highlighted_page(pdf_path: str, page_num: int, query: str, dpi: int =
 
 def try_render(pdf_path: str, page_num: int, query: str) -> bytes | None:
     if not os.path.ismount(DRIVE_MOUNT):
-        print("one")
         return None                              # drive not connected
     if not os.path.exists(pdf_path):
-        print(pdf_path)
         return None                              # mounted but file missing
     try:
         return render_highlighted_page(pdf_path, page_num, query)
