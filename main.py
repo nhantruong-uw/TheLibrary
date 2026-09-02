@@ -118,11 +118,12 @@ def run_chunking(conn):
         count += 1
     print("Finished chunking " + str(count) + "/" + str(len(docs)) + " documents")
 
-from mounting import resolve_corpus_root, DRIVE_ID
+from mounting import resolve_corpus_root, DRIVE_ID, find_mountpoint
 
 if __name__ == "__main__":
     with psycopg.connect(DATABASE_URL) as conn:
-        root = resolve_corpus_root(DRIVE_ID) / "Files"
+        root = resolve_corpus_root(DRIVE_ID) / "Files" / "Sherlock Holmes"
+        ingest_files(conn, root, DRIVE_ID)
         run_extraction(conn, root=root)
         run_metadata_backfill(conn, root=root)
         run_chunking(conn)
