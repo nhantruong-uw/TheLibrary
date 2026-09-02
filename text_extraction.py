@@ -1,4 +1,5 @@
 import pymupdf
+import psycopg
 
 def classify_document(doc) -> str:
     """
@@ -34,6 +35,9 @@ def detect_text_source(doc) -> str:
         return "ocr"
     return "digital"
 
+# envir errors; halt the whole run
+ENVIRONMENT_ERRORS = (psycopg.OperationalError, OSError)
+
 def extract_one(conn, doc_id: int, full_path: str):
     """
     try to extract from a pdf and update the documents as needed;
@@ -47,16 +51,12 @@ def extract_one(conn, doc_id: int, full_path: str):
         None
     """
     try:
-        doc = pymupdf.open(full_path)
-        try:
+        with pymupdf.open(full_path) as doc:
             text, page_offsets = extract_text_with_pages(doc)
             chars_per_page = len(text) / max(len(doc), 1)
             status = "needs_ocr" if chars_per_page < 50 else "extracted"
             source = detect_text_source(doc)
             page_count = len(doc)
-        finally:
-            doc.close()
-
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -64,15 +64,19 @@ def extract_one(conn, doc_id: int, full_path: str):
                 SET status = %s, text_source = %s, page_count = %s, full_text = %s, page_offsets = %s
                 WHERE id = %s
                 """,
-                (status, source, page_count, text, doc_id),
+                (status, source, page_count, text.replace('\x00', ''), page_offsets, doc_id),
             )
-    except Exception as e:
+        conn.commit()
+    except ENVIRONMENT_ERRORS:
+        raise
+    except (pymupdf.FileDataError, pymupdf.EmptyFileError, ValueError) as e:
+        conn.rollback()
         with conn.cursor() as cur:
             cur.execute(
                 "UPDATE documents SET status = 'failed', error_msg = %s WHERE id = %s",
                 (str(e), doc_id),
             )
-    conn.commit()
+        conn.commit()
 
 def extract_text_with_pages(doc):
     parts = []
