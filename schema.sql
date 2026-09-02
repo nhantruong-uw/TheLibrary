@@ -15,8 +15,7 @@ CREATE TABLE documents(
     text_source TEXT,
     error_msg TEXT,
     full_text TEXT,
-    page_offsets INTEGER[],
-    text_search tsvector GENERATED ALWAYS AS (to_tsvector('english', chunk_text)) STORED
+    page_offsets INTEGER[]
 );
 
 CREATE TABLE chunks(
@@ -26,7 +25,8 @@ CREATE TABLE chunks(
     page_num INT,
     char_start INT,
     char_end INT,
-    chunk_index INT NOT NULL
+    chunk_index INT NOT NULL,
+    text_search tsvector GENERATED ALWAYS AS (to_tsvector('english', chunk_text)) STORED
 );
 
 CREATE INDEX chunks_text_search_idx ON chunks USING GIN (text_search);
