@@ -14,7 +14,8 @@ CREATE TABLE documents(
     file_mtime DOUBlE PRECISION,
     text_source TEXT,
     error_msg TEXT,
-    full_text TEXT
+    full_text TEXT,
+    page_offsets INTEGER[]
 );
 
 CREATE TABLE chunks(
