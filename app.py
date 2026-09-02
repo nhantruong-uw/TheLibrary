@@ -3,6 +3,34 @@ import streamlit as st
 import requests
 import html
 import re
+from mounting import DRIVE_MOUNT
+import pymupdf
+import os
+
+def render_highlighted_page(pdf_path: str, page_num: int, query: str, dpi: int = 100) -> bytes:
+    with pymupdf.open(pdf_path) as doc:
+        page = doc[page_num - 1]                 # your page_num is 1-indexed
+        for rect in page.search_for(query):
+            annot = page.add_highlight_annot(rect)
+            annot.update()
+        pix = page.get_pixmap(dpi=dpi)
+        return pix.tobytes("png")
+
+def try_render(pdf_path: str, page_num: int, query: str) -> bytes | None:
+    if not os.path.ismount(DRIVE_MOUNT):
+        print("one")
+        return None                              # drive not connected
+    if not os.path.exists(pdf_path):
+        print(pdf_path)
+        return None                              # mounted but file missing
+    try:
+        return render_highlighted_page(pdf_path, page_num, query)
+    except Exception:
+        return None                              # corrupt page, render failure
+
+@st.cache_data
+def cached_render(pdf_path: str, page_num: int, query: str) -> bytes | None:
+    return try_render(pdf_path, page_num, query)
 
 st.set_page_config(page_title="The Library", layout="wide")
 st.title("The Library")
@@ -37,3 +65,11 @@ if query:
                 # NOW restore only your mark tags:
                 safe = safe.replace("&lt;mark&gt;", "<mark>").replace("&lt;/mark&gt;", "</mark>")
                 st.markdown(f"- *(pg {p}):* " + safe, unsafe_allow_html=True)
+
+                with st.expander("Show Page"):
+                    full_path = DRIVE_MOUNT + "/Files/Sherlock Holmes/" + cleaned_results[r]['rel_path']
+                    img = cached_render(full_path, int(p), query)
+                    if img:
+                        st.image(img)
+                    else:
+                        st.info(f"Drive not connected — see page {p} in {r}")
