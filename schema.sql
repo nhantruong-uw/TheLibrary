@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+
 CREATE TYPE doc_status AS ENUM ('pending', 'extracted', 'chunked', 'embedded', 'failed', 'needs_ocr');
 
 CREATE TABLE documents(
@@ -26,7 +28,8 @@ CREATE TABLE chunks(
     char_start INT,
     char_end INT,
     chunk_index INT NOT NULL,
-    text_search tsvector GENERATED ALWAYS AS (to_tsvector('english', chunk_text)) STORED
+    text_search tsvector GENERATED ALWAYS AS (to_tsvector('english', chunk_text)) STORED,
+    embedding vector(384)
 );
 
 CREATE INDEX chunks_text_search_idx ON chunks USING GIN (text_search);
