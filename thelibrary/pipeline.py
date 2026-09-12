@@ -4,8 +4,10 @@ import time
 from pathlib import Path
 
 import pymupdf
+from pgvector.psycopg import register_vector
 
 from .chunking import chunk_with_offsets
+from .embedding import embed_passages
 from .file_discovery_inventory import find_pdfs, hash_file
 from .metadata import resolve_authors, resolve_title
 from .text_extraction import extract_one, page_for_offset
@@ -158,6 +160,49 @@ def run_chunking(conn):
         conn.commit()
         count += 1
     print(f"Finished chunking {count}/{len(docs)} documents")
+
+
+def run_embedding(conn, batch_size=32):
+    """Embed every chunk of each "chunked" document and store the vectors.
+
+    Args:
+        conn: Open database connection.
+        batch_size: Number of chunks to embed per model call.
+
+    Returns:
+        None.
+    """
+    register_vector(conn)
+    with conn.cursor() as cur:
+        cur.execute("SELECT id FROM documents WHERE status = 'chunked'")
+        doc_ids = [row[0] for row in cur.fetchall()]
+
+    print(f"{len(doc_ids)} documents to embed")
+    for doc_id in doc_ids:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, chunk_text FROM chunks WHERE document_id = %s ORDER BY chunk_index",
+                (doc_id,),
+            )
+            chunks = cur.fetchall()
+
+        for i in range(0, len(chunks), batch_size):
+            batch = chunks[i:i + batch_size]
+            vectors = embed_passages([text for _, text in batch])
+            with conn.cursor() as cur:
+                for (chunk_id, _), vector in zip(batch, vectors):
+                    cur.execute(
+                        "UPDATE chunks SET embedding = %s WHERE id = %s",
+                        (vector, chunk_id),
+                    )
+
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE documents SET status = 'embedded' WHERE id = %s",
+                (doc_id,),
+            )
+        conn.commit()
+    print(f"Finished embedding {len(doc_ids)} documents")
 
 
 def discover_incremental(conn, root: Path, drive_id: str):

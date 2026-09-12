@@ -1,16 +1,18 @@
 [project]
 name = "thelibrary"
 version = "0.1.0"
-description = "Searchable database over a hard drive of PDFs, with keyword search and page-level highlighting."
+description = "Searchable database over a hard drive of PDFs, with hybrid keyword/semantic search and page-level highlighting."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.141.1",
     "langchain-text-splitters>=1.1.2",
+    "pgvector>=0.5.0",
     "psycopg[binary]>=3.3.4",
     "pymupdf>=1.28.2",
     "python-dotenv>=1.2.2",
     "requests>=2.34.2",
+    "sentence-transformers>=6.0.1",
     "streamlit>=1.63.0",
     "tiktoken>=0.14.0",
     "uvicorn>=0.52.4",

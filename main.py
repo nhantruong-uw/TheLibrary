@@ -8,6 +8,7 @@ from thelibrary.pipeline import (
     discover_incremental,
     ingest_files,
     run_chunking,
+    run_embedding,
     run_extraction,
     run_metadata_backfill,
 )
@@ -51,6 +52,12 @@ def main():
             run_chunking(conn)
             print("-" * 20)
             print("...End chunking")
+            print()
+            print("Begin embedding...")
+            print("-" * 20)
+            run_embedding(conn)
+            print("-" * 20)
+            print("...End embedding")
     elif choice == "2":
         print("What is your desired directory?")
         folder = input("Desired Directory: ")

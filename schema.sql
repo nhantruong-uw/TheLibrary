@@ -33,3 +33,4 @@ CREATE TABLE chunks(
 );
 
 CREATE INDEX chunks_text_search_idx ON chunks USING GIN (text_search);
+CREATE INDEX chunks_embedding_idx ON chunks USING hnsw (embedding vector_cosine_ops);

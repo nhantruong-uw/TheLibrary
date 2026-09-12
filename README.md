@@ -1,8 +1,8 @@
 # TheLibrary
 
-A searchable database over a hard drive of PDFs — keyword search today, semantic
-search and reranking planned, with results that link back to a highlighted page
-in the original document.
+A searchable database over a hard drive of PDFs — hybrid keyword + semantic
+search, with results that link back to a highlighted page in the original
+document. Reranking is planned next.
 
 ## Architecture
 
@@ -14,10 +14,10 @@ disconnect, and that's where the UI shows a "drive not connected" message
 instead of failing.
 
 ```
-main.py ──ingest/extract/chunk──▶ Postgres ◀──full-text search── apis.py (FastAPI)
-                                                                        ▲
-                                                                        │ HTTP
-                                                                   app.py (Streamlit)
+main.py ──ingest/extract/chunk/embed──▶ Postgres ◀──hybrid search── apis.py (FastAPI)
+                                                                          ▲
+                                                                          │ HTTP
+                                                                     app.py (Streamlit)
 ```
 
 ## Project layout
@@ -30,7 +30,9 @@ thelibrary/                    Core library package
     text_extraction.py         Extract text + per-page offsets with PyMuPDF
     metadata.py                Resolve a usable title/author from PDF metadata
     chunking.py                Split document text into overlapping, offset-tracked chunks
-    pipeline.py                Ingestion pipeline: discover -> extract -> backfill -> chunk
+    embedding.py                Embed chunk text and search queries with bge-small-en-v1.5
+    search.py                  Hybrid lexical + vector search, fused with RRF
+    pipeline.py                Ingestion pipeline: discover -> extract -> backfill -> chunk -> embed
 
 main.py                        Interactive CLI entry point that drives the pipeline
 apis.py                        FastAPI app exposing GET /search
@@ -51,11 +53,13 @@ TASKS.md                       Working log and roadmap (not tracked for style he
 | Metadata | Embedded PDF metadata + filename fallback | In use (GROBID evaluated, skipped — corpus metadata is clean enough) |
 | Chunking | LangChain `RecursiveCharacterTextSplitter` (tiktoken-based) | In use |
 | Search | Postgres full-text search (`tsvector`/`tsquery`, GIN index) | In use |
+| Embeddings | `bge-small-en-v1.5` (384-dim), via `sentence-transformers` | In use |
+| Vector search | pgvector, `vector_cosine_ops` HNSW index | In use |
+| Fusion | Reciprocal Rank Fusion over lexical + vector rankings | In use |
 | API | FastAPI | In use (`GET /search`) |
 | Frontend | Streamlit | In use |
 | OCR | Tesseract (`pytesseract`) | Planned — scanned PDFs are flagged `needs_ocr` but not yet OCR'd |
-| Embeddings | `bge-small-en-v1.5` (384-dim) via pgvector | Planned |
-| Reranking | `bge-reranker-base` | Planned |
+| Reranking | `bge-reranker-base` cross-encoder over the fused top-k | Planned |
 
 See [TASKS.md](TASKS.md) for the detailed goal-by-goal working log.
 
@@ -76,12 +80,18 @@ See [TASKS.md](TASKS.md) for the detailed goal-by-goal working log.
 4. **Chunking** (`thelibrary/chunking.py`) splits each document's full text into
    ~400-token chunks with 50-token overlap, mapping each chunk back to the page
    it starts on via the offsets recorded during extraction.
-5. **Search** (`apis.py`) runs Postgres full-text search over chunk text,
-   ranking with `ts_rank` and generating a highlighted snippet with
-   `ts_headline`.
-6. **UI** (`app.py`) queries the search API, groups results by document, and
-   — when the source drive is mounted — renders the matched page as a PNG with
-   the query terms highlighted.
+5. **Embedding** (`thelibrary/embedding.py`, `thelibrary/pipeline.py`) encodes
+   each chunk's text with `bge-small-en-v1.5` and stores the 384-dim vector on
+   the chunk row, then marks the document `embedded`.
+6. **Search** (`thelibrary/search.py`) runs two independent retrieval signals
+   per query — Postgres full-text search (`ts_rank`) and pgvector cosine
+   similarity over chunk embeddings — and merges their ranked lists with
+   Reciprocal Rank Fusion so a chunk that scores well on either signal
+   surfaces near the top. Chunks not yet embedded simply fall back to
+   lexical-only ranking. Snippets are generated with `ts_headline`.
+7. **UI** (`app.py`) queries the search API (`apis.py`), groups results by
+   document, and — when the source drive is mounted — renders the matched
+   page as a PNG with the query terms highlighted.
 
 ## Setup
 
@@ -107,7 +117,7 @@ docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR
 ## Running it
 
 ```bash
-# Ingest, extract, backfill metadata, and chunk a folder of PDFs
+# Ingest, extract, backfill metadata, chunk, and embed a folder of PDFs
 python main.py
 
 # Search API (http://127.0.0.1:8000/docs for the interactive docs)
@@ -118,9 +128,12 @@ streamlit run app.py --server.address 127.0.0.1 --server.port 8501
 ```
 
 `main.py` is an interactive menu: option 1 ingests a new folder end to end
-(discovery through chunking); option 2 re-scans a folder and ingests only
+(discovery through embedding); option 2 re-scans a folder and ingests only
 files that are new or whose size/modified time changed, without re-hashing
 unchanged files.
+
+The first embedding call downloads `bge-small-en-v1.5` (~130MB) from the
+Hugging Face Hub and caches it locally; after that it loads from cache.
 
 ## License
 
