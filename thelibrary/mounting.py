@@ -1,9 +1,14 @@
-import subprocess
+"""Locate the removable drive that holds the PDF corpus."""
+
 import json
+import subprocess
 from pathlib import Path
 
+DRIVE_ID = "029B-2C3A"
+
+
 def list_mounts():
-    """Show all mounted block devices with their UUID and current mountpoint."""
+    """Print all mounted block devices with their UUID and mountpoint."""
     out = subprocess.run(
         ["lsblk", "-J", "-o", "NAME,UUID,LABEL,MOUNTPOINT,FSTYPE"],
         capture_output=True, text=True,
@@ -20,7 +25,16 @@ def list_mounts():
 
     walk(data.get("blockdevices", []))
 
+
 def find_mountpoint(drive_uuid: str) -> str | None:
+    """Find the current mountpoint of a drive, identified by its UUID.
+
+    Args:
+        drive_uuid: The volume UUID reported by blkid/lsblk.
+
+    Returns:
+        The mountpoint path, or None if the drive isn't mounted.
+    """
     out = subprocess.run(
         ["lsblk", "-J", "-o", "UUID,MOUNTPOINT"],
         capture_output=True, text=True,
@@ -39,10 +53,22 @@ def find_mountpoint(drive_uuid: str) -> str | None:
 
     return search(data.get("blockdevices", []))
 
-DRIVE_ID = "029B-2C3A"
+
 DRIVE_MOUNT = find_mountpoint(DRIVE_ID)
 
+
 def resolve_corpus_root(drive_id: str) -> Path:
+    """Resolve the corpus root directory from a drive UUID.
+
+    Args:
+        drive_id: The volume UUID of the drive holding the corpus.
+
+    Returns:
+        The mountpoint path of the drive.
+
+    Raises:
+        RuntimeError: If the drive is not currently mounted.
+    """
     mount = find_mountpoint(drive_id)
     if mount is None:
         raise RuntimeError(f"drive {drive_id} not mounted — plug it in")

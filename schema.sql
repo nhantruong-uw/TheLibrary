@@ -11,7 +11,7 @@ CREATE TABLE documents(
     ingested_timestamp TIMESTAMPTZ NOT NULL DEFAULT now(), -- automated and real time-stamp
     status doc_status NOT NULL DEFAULT 'pending',
     file_size BIGINT,
-    file_mtime DOUBlE PRECISION,
+    file_mtime DOUBLE PRECISION,
     text_source TEXT,
     error_msg TEXT,
     full_text TEXT,

@@ -1,19 +1,22 @@
+"""Discover PDFs on disk and track their ingestion status in the database."""
+
+import hashlib
 import logging
 from pathlib import Path
-import hashlib
-from config import CORPUS_DIR
+
+from .config import CORPUS_DIR
 
 log = logging.getLogger(__name__)
 
-def find_pdfs(root: Path):
-    """
-    a generator to find all PDF's of a given root directory
 
-    Parameters:
-        root: URL to the root in Path datatype
-    
-    Returns:
-        no returns; simply yield as requested from caller
+def find_pdfs(root: Path):
+    """Yield every PDF found under a root directory.
+
+    Args:
+        root: Directory to search, as a Path.
+
+    Yields:
+        Path objects for each PDF file found.
     """
     for p in root.rglob("*"):
         try:
@@ -22,16 +25,16 @@ def find_pdfs(root: Path):
         except OSError as e:
             log.warning("skipping %s: %s", p, e)
 
-def hash_file(path: Path, chunk_size=65536) -> str:
-    """
-    Hash a file with SHA-256 given by path by chunks of chunk_size; process chunk by chunk
 
-    Parameters:
-        path: path to file in Path datatype
-        chunk_size: size of chunk to process; default is 65536
-    
+def hash_file(path: Path, chunk_size=65536) -> str:
+    """Compute the SHA-256 hash of a file, reading it in chunks.
+
+    Args:
+        path: Path to the file to hash.
+        chunk_size: Number of bytes to read per chunk.
+
     Returns:
-        the hash
+        The hex-encoded SHA-256 digest.
     """
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -39,29 +42,29 @@ def hash_file(path: Path, chunk_size=65536) -> str:
             h.update(chunk)
     return h.hexdigest()
 
-def file_stats(path: Path) -> dict:
-    """
-    Give the stats of the file indicated by the path.
 
-    Parameters:
-        path: Path
-    
+def file_stats(path: Path) -> dict:
+    """Get the size and modification time of a file.
+
+    Args:
+        path: Path to the file.
+
     Returns:
-        return a dictionary with size and mtime, where size is size of file and mtime is last modified time
+        A dict with "size" (bytes) and "mtime" (seconds since epoch).
     """
     st = path.stat()
     return {"size": st.st_size, "mtime": st.st_mtime}
 
-def ingest_file(conn, file_path: Path):
-    """
-    Given a file, insert the file and relevant information into the database as indicated by DATABASE_URL;
-    commits final query at the end to ensure changes
 
-    Parameters:
-        root: Path
+def ingest_file(conn, file_path: Path):
+    """Insert a single file into the documents table, if not already present.
+
+    Args:
+        conn: Open database connection.
+        file_path: Path to the file to ingest.
 
     Returns:
-        Nothing; sql errors if any
+        None.
     """
     with conn.cursor() as cur:
         file_hash = hash_file(file_path)
@@ -77,12 +80,15 @@ def ingest_file(conn, file_path: Path):
         )
     conn.commit()
 
-def status_counts(conn):
-    """
-    count the number of files per status type
 
-    Parameters:
-        conn: connection to db
+def status_counts(conn):
+    """Count documents grouped by ingestion status.
+
+    Args:
+        conn: Open database connection.
+
+    Returns:
+        A dict mapping status to the number of documents with that status.
     """
     with conn.cursor() as cur:
         cur.execute("SELECT status, count(*) FROM documents GROUP BY status ORDER BY status")
