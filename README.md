@@ -113,6 +113,7 @@ docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | `docker-compose.yml` | Credentials for the Postgres container |
 | `DATABASE_URL` | `thelibrary/config.py` | Full connection string used by the app |
 | `CORPUS_DIR` | `thelibrary/config.py` | Root directory of the PDF corpus (defaults to `test_corpus`) |
+| `DRIVE_ID` | `thelibrary/config.py` | Your desired drive UUID (KEEP THIS SAFE AND SECRET!) |
 
 ## Running it
 

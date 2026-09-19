@@ -3,9 +3,7 @@
 import json
 import subprocess
 from pathlib import Path
-
-DRIVE_ID = "029B-2C3A"
-
+from config import DRIVE_ID
 
 def list_mounts():
     """Print all mounted block devices with their UUID and mountpoint."""
